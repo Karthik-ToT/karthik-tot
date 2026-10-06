@@ -871,13 +871,16 @@ float cloudTexA(vec3 pc){
 float cloudAt(vec3 p){
     vec3 pc =
         rotY(p,-uRelRot);
+    float f_cloudAt = 0.0;
     if(uUseCloudTex > 0.5)
-        return cloudTexA(pc);
-    return smoothstep(
-        0.52,
-        0.72,
-        cloudDens(pc)
-    );
+        f_cloudAt = cloudTexA(pc);
+    else
+        f_cloudAt = smoothstep(
+            0.52,
+            0.72,
+            cloudDens(pc)
+        );
+    return f_cloudAt;
 }
 void main(){
     vec3 p = normalize(vPos);
@@ -963,20 +966,48 @@ void main(){
                     uWaterMap,
                     uv
                 ).r * blueDom,
-                blueDom*0.9
+                blueDom*0.8
             ),
             0.0,
             1.0
         );
+    vec3 ocean =
+        vec3(
+            0.04,
+            0.16,
+            0.31
+        );
+    vec3 landBase =
+        vec3(
+            0.38,
+            0.54,
+            0.30
+        );
     vec3 alb =
-        pow(
+        mix(
+            ocean,
+            mix(
+                landBase,
+                d0,
+                0.72
+            ),
+            1.0 - waterM
+        );
+    alb =
+        mix(
+            alb,
             d0,
-            vec3(2.0)
+            0.18
+        );
+    alb =
+        pow(
+            alb,
+            vec3(1.45)
         );
     alb *=
         1.0 +
         (m0-0.5) *
-        0.30 *
+        0.08 *
         uDetail *
         (1.0-waterM);
     /* Sun */
@@ -996,23 +1027,22 @@ void main(){
         );
     float dayF =
         smoothstep(
-            -0.06,
-            0.22,
+            -0.28,
+            0.18,
             ndl0
         );
     float shadow =
         1.0 -
-        cloudAt(p)*0.5;
+        cloudAt(p)*0.55;
     vec3 sunC =
         vec3(
             1.0,
             0.96,
-            0.9
+            0.90
         );
     vec3 dayCol =
         alb *
-        diff *
-        2.2 *
+        (0.08 + diff*0.38) *
         sunC *
         shadow;
     /* Ocean reflection */
@@ -1021,8 +1051,8 @@ void main(){
             viewDir+uSunDir
         );
     float wave =
-        0.6 +
-        0.4 *
+        0.67 +
+        0.33 *
         noise(
             p*180.0+
             vec3(uTime*0.35)
@@ -1030,8 +1060,8 @@ void main(){
     dayCol +=
         vec3(
             1.0,
-            0.9,
-            0.72
+            0.94,
+            0.86
         )
         *
         pow(
@@ -1039,17 +1069,17 @@ void main(){
                 dot(n,hv),
                 0.0
             ),
-            160.0+130.0*wave
+            320.0+240.0*wave
         )
         *
         waterM *
         dayF *
-        2.4;
+        0.12;
     dayCol +=
         vec3(
             1.0,
-            0.95,
-            0.85
+            0.96,
+            0.88
         )
         *
         pow(
@@ -1057,15 +1087,15 @@ void main(){
                 dot(n,hv),
                 0.0
             ),
-            24.0
+            28.0
         )
         *
-        0.05 *
+        0.03 *
         dayF;
     /* Terminator */
     float dusk =
         smoothstep(
-            0.35,
+            0.42,
             0.0,
             abs(ndl0)
         ) *
@@ -1073,8 +1103,8 @@ void main(){
     dayCol *=
         mix(
             vec3(1.0),
-            vec3(1.3,0.83,0.6),
-            dusk*0.55
+            vec3(1.12,0.84,0.66),
+            dusk*0.26
         );
     /* Night */
     vec3 nRaw =
@@ -1091,107 +1121,61 @@ void main(){
             0.0,
             1.0
         );
+    float twilight =
+        smoothstep(
+            -0.18,
+            0.24,
+            ndl0
+        );
     vec3 nightCol =
-        alb *
-        vec3(
-            0.030,
-            0.042,
-            0.070
+        mix(
+            alb *
+            vec3(
+                0.055,
+                0.065,
+                0.094
+            ),
+            alb *
+            vec3(
+                0.12,
+                0.14,
+                0.18
+            ),
+            1.0 - twilight
         );
     nightCol +=
         alb *
         vec3(
-            0.30,
-            0.36,
-            0.50
+            0.10,
+            0.14,
+            0.22
         )
         *
-        0.10 *
+        0.08 *
         moonF;
     vec3 lights =
         pow(
             nRaw,
-            vec3(1.25)
+            vec3(1.75)
         )
         *
-        2.2
+        1.6
         +
         pow(
             nRaw,
-            vec3(0.5)
+            vec3(0.55)
         )
         *
-        0.22;
+        0.10;
     nightCol +=
         lights *
         vec3(
-            1.05,
-            0.93,
-            0.78
-        );
-    /* Aurora */
-    float band =
-        smoothstep(
-            0.84,
-            0.90,
-            absLat
+            1.08,
+            0.98,
+            0.82
         )
         *
-        (
-            1.0 -
-            smoothstep(
-                0.96,
-                0.995,
-                absLat
-            )
-        );
-    float an =
-        fbm4(
-            p*6.0+
-            vec3(
-                uTime*0.06,
-                uTime*0.02,
-                0.0
-            )
-        );
-    float curtain =
-        noise(
-            p*36.0+
-            vec3(
-                0.0,
-                0.0,
-                uTime*0.15
-            )
-        );
-    float aur =
-        band *
-        smoothstep(
-            0.35,
-            0.8,
-            an
-        )
-        *
-        (0.4+0.6*curtain)
-        *
-        (1.0-dayF);
-    nightCol +=
-        vec3(
-            0.10,
-            0.85,
-            0.45
-        )
-        *
-        aur *
-        0.35;
-    nightCol +=
-        vec3(
-            0.55,
-            0.25,
-            0.85
-        )
-        *
-        aur *
-        0.12;
+        0.92;
     vec3 c =
         mix(
             nightCol,
@@ -1206,20 +1190,36 @@ void main(){
                 dot(p,viewDir),
                 0.0
             ),
-            2.5
+            2.8
         );
     vec3 atmC =
         vec3(
-            0.30,
-            0.55,
-            0.95
+            0.12,
+            0.46,
+            0.88
+        );
+    vec3 warmAtm =
+        vec3(
+            1.0,
+            0.78,
+            0.56
+        );
+    float atmBlend =
+        smoothstep(
+            -0.35,
+            0.45,
+            ndl0
         );
     c +=
-        atmC *
+        mix(
+            atmC,
+            warmAtm,
+            atmBlend * 0.28
+        ) *
         fres *
         (
-            0.10 +
-            0.55 *
+            0.05 +
+            0.14 *
             max(
                 ndl0,
                 0.0
@@ -1228,16 +1228,24 @@ void main(){
     c =
         mix(
             c,
-            atmC *
+            mix(
+                atmC,
+                warmAtm,
+                smoothstep(
+                    -0.28,
+                    0.35,
+                    ndl0
+                )
+            ) *
             (
-                0.16 +
-                0.75 *
+                0.10 +
+                0.26 *
                 max(
                     ndl0,
-                    0.15
+                    0.0
                 )
             ),
-            fres*0.30
+            fres*0.18
         );
     /* ACES */
     c =
@@ -1424,7 +1432,7 @@ void main(){
     float maria =
         smoothstep(
             0.5,
-            0.64,
+            0.66,
             fbm4(
                 p*1.4+
                 vec3(5.0)
@@ -1437,34 +1445,34 @@ void main(){
             noise(p*16.0)
         )
         *
-        0.45
+        0.38
         +
         smoothstep(
             0.78,
-            0.95,
+            0.94,
             noise(p*34.0)
         )
         *
-        0.3;
+        0.24;
     vec3 col =
         mix(
             vec3(
-                0.60,
-                0.59,
-                0.57
+                0.78,
+                0.76,
+                0.74
             ),
             vec3(
-                0.27,
-                0.27,
-                0.30
+                0.52,
+                0.50,
+                0.47
             ),
             maria
         );
     col *=
-        0.72 +
-        0.55*b;
+        0.82 +
+        0.38*b;
     col *=
-        1.0-crat;
+        1.0-crat*0.7;
     vec3 upv =
         abs(p.y)>0.98
         ?
@@ -1499,7 +1507,7 @@ void main(){
                 t2*g2
             )
             *
-            14.0
+            12.0
         );
     float diff =
         max(
@@ -1509,35 +1517,35 @@ void main(){
     float nightF =
         1.0 -
         smoothstep(
-            -0.05,
-            0.2,
+            -0.08,
+            0.16,
             dot(p,uSunDir)
         );
-    float eshine =
-        max(
-            dot(
-                p,
-                normalize(uCamObj)
+    float rim =
+        pow(
+            1.0 -
+            max(
+                dot(n,normalize(uCamObj)),
+                0.0
             ),
-            0.0
+            2.0
         );
     vec3 c =
         col *
         (
-            diff*1.25 +
-            0.012
+            0.18 +
+            diff*1.15
         );
     c +=
-        col *
         vec3(
-            0.12,
-            0.18,
-            0.3
+            0.06,
+            0.07,
+            0.08
         )
         *
-        eshine *
+        rim *
         nightF *
-        0.3;
+        0.7;
     c =
         clamp(
             (
@@ -2170,6 +2178,7 @@ let spinC;
 
 let moon;
 let stars;
+let sunPos;
 
 let raycaster;
 
@@ -2184,12 +2193,52 @@ let starMat;
 ========================================================= */
 
 const SUN_DIR =
-    new THREE.Vector3(
-        -20,
-        4,
-        -28
-    ).normalize();
+    new THREE.Vector3();
 
+function getRealSunDirection(date = new Date()){
+    const hours =
+        date.getHours() +
+        date.getMinutes() / 60 +
+        date.getSeconds() / 3600;
+
+    const startOfYear =
+        new Date(
+            date.getFullYear(),
+            0,
+            0
+        );
+
+    const dayOfYear =
+        Math.floor(
+            (date.getTime() - startOfYear.getTime()) / 86400000
+        );
+
+    const declination =
+        (23.44 * Math.PI / 180) *
+        Math.sin(
+            ((360 / 365) * (dayOfYear - 81) * Math.PI) / 180
+        );
+
+    const hourAngle =
+        ((hours - 12) * 15) * Math.PI / 180;
+
+    const x =
+        Math.cos(declination) *
+        Math.sin(hourAngle);
+
+    const y =
+        Math.sin(declination);
+
+    const z =
+        Math.cos(declination) *
+        Math.cos(hourAngle);
+
+    return new THREE.Vector3(
+        x,
+        y,
+        z
+    ).normalize();
+}
 
 const _q =
     new THREE.Quaternion();
@@ -2217,6 +2266,12 @@ const camObjM =
 
 const _v3 =
     new THREE.Vector3();
+
+function refreshRealSun(){
+    SUN_DIR.copy(
+        getRealSunDirection()
+    ).multiplyScalar(26);
+}
 
 
 /* =========================================================
@@ -2409,8 +2464,8 @@ try{
 
     const seg =
         isMobile
-        ? [128,80]
-        : [192,128];
+        ? [160,96]
+        : [256,180];
 
 
     earthMesh =
@@ -2473,8 +2528,8 @@ try{
         new THREE.Mesh(
             new THREE.SphereGeometry(
                 1.012,
-                isMobile ? 96 : 128,
-                isMobile ? 64 : 96
+                isMobile ? 120 : 180,
+                isMobile ? 80 : 120
             ),
             cloudMat
         );
@@ -2982,13 +3037,15 @@ try{
     const gt=glowTex();
 
 
-    const sunPos =
+    sunPos =
         new THREE.Vector3(
             -20,
             4,
             -28
         );
 
+    refreshRealSun();
+    sunPos.copy(SUN_DIR);
 
     const mkSprite =
         (scale,opacity,rotation)=>{
@@ -3933,13 +3990,13 @@ const ctl={
 
     phi:1.12,
 
-    r:8.8,
+    r:6.8,
 
     tTheta:-0.42,
 
     tPhi:1.24,
 
-    tR:3.55
+    tR:2.8
 };
 
 
@@ -4973,8 +5030,35 @@ function loop(now){
     requestAnimationFrame(
         loop
     );
+
+    const realNow =
+        new Date();
+
+    const localDayProgress =
+        (
+            realNow.getHours() +
+            realNow.getMinutes() / 60 +
+            realNow.getSeconds() / 3600 +
+            realNow.getMilliseconds() / 3600000
+        ) / 24;
+
+    const earthDayRotation =
+        localDayProgress *
+        Math.PI *
+        2 +
+        2.1;
+
+    refreshRealSun();
+    if(sunPos)
+        sunPos.copy(SUN_DIR);
+
     const t =
         now/1000;
+
+    spinE.rotation.y =
+        earthDayRotation;
+    spinC.rotation.y =
+        earthDayRotation + 0.08;
     const dt =
         Math.min(
             0.05,
@@ -4986,10 +5070,6 @@ function loop(now){
         );
     last=t;
     framesOK++;
-    spinE.rotation.y +=
-        dt*0.012;
-    spinC.rotation.y +=
-        dt*0.0145;
     moon.position.set(
         Math.cos(
             t*0.02+2.1
@@ -5131,7 +5211,8 @@ function loop(now){
         .value
         .copy(
             sunObjE
-        );
+        )
+        .normalize();
     earthMat
         .uniforms
         .uCamObj
@@ -5183,8 +5264,8 @@ function loop(now){
         .uniforms
         .uBump
         .value =
-            1.4+
-            detail*2.2;
+            0.9+
+            detail*1.6;
     cloudMesh
         .getWorldQuaternion(
             _q
@@ -5215,7 +5296,8 @@ function loop(now){
         .value
         .copy(
             sunObjC
-        );
+        )
+        .normalize();
     cloudMat
         .uniforms
         .uCamObj
